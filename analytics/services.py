@@ -4,6 +4,8 @@ Market data helpers: normalize Indian tickers and fetch last price via yfinance.
 
 from __future__ import annotations
 
+import contextlib
+import io
 import logging
 from decimal import Decimal
 
@@ -33,17 +35,19 @@ def fetch_last_close(ticker: str) -> Decimal | None:
     if not ticker:
         return None
     try:
-        t = yf.Ticker(ticker)
-        hist = t.history(period="5d")
-        if hist is not None and not hist.empty and "Close" in hist.columns:
-            last = hist["Close"].iloc[-1]
-            if last is not None:
-                return Decimal(str(round(float(last), 4)))
-        # Some tickers expose last_price in fast_info
-        fi = getattr(t, "fast_info", None) or {}
-        lp = fi.get("last_price") or fi.get("previous_close")
-        if lp is not None:
-            return Decimal(str(round(float(lp), 4)))
+        # yfinance prints "$TICKER: possibly delisted" to stderr for bad symbols; keep runserver clean.
+        with contextlib.redirect_stderr(io.StringIO()), contextlib.redirect_stdout(io.StringIO()):
+            t = yf.Ticker(ticker)
+            hist = t.history(period="5d")
+            if hist is not None and not hist.empty and "Close" in hist.columns:
+                last = hist["Close"].iloc[-1]
+                if last is not None:
+                    return Decimal(str(round(float(last), 4)))
+            # Some tickers expose last_price in fast_info
+            fi = getattr(t, "fast_info", None) or {}
+            lp = fi.get("last_price") or fi.get("previous_close")
+            if lp is not None:
+                return Decimal(str(round(float(lp), 4)))
     except Exception as e:
         logger.warning("yfinance failed for %s: %s", ticker, e)
     return None

@@ -17,6 +17,8 @@ class Holding(models.Model):
     quantity = models.DecimalField(max_digits=18, decimal_places=6)
     buy_price = models.DecimalField(max_digits=18, decimal_places=4)
     buy_date = models.DateField()
+    # Optional LTP from CSV (e.g. broker export). Used when Yahoo Finance has no quote.
+    csv_ltp = models.DecimalField(max_digits=18, decimal_places=4, null=True, blank=True)
 
     class Meta:
         ordering = ["-buy_date"]

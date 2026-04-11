@@ -16,6 +16,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from .metrics import compute_insights, portfolio_loss_and_recovery, top_gainers_and_losers
 from .serializers import AnalysisResponseSerializer, AnalysisSummarySerializer, StockPerformanceSerializer
 from .services import fetch_last_close, normalize_ticker
 
@@ -63,10 +64,17 @@ class PortfolioAnalysisView(APIView):
             inv = _dec4(qty * bp)
             total_investment += inv
             ticker_used = normalize_ticker(h.stock_name)
-            price = fetch_last_close(ticker_used) if ticker_used else None
+            live = fetch_last_close(ticker_used) if ticker_used else None
+            if live is not None:
+                price = _dec4(live)
+                price_source = "live"
+            elif getattr(h, "csv_ltp", None) is not None:
+                price = _dec4(h.csv_ltp)
+                price_source = "csv"
+            else:
+                price = None
+                price_source = "none"
             price_ok = price is not None
-            if price is not None:
-                price = _dec4(price)
             if price_ok:
                 priced_count += 1
                 cv = _dec4(qty * price)
@@ -91,6 +99,7 @@ class PortfolioAnalysisView(APIView):
                     "profit_loss": pl,
                     "profit_loss_percent": pl_pct,
                     "price_available": price_ok,
+                    "price_source": price_source,
                 }
             )
 
@@ -102,6 +111,9 @@ class PortfolioAnalysisView(APIView):
             profit_loss_percent = _row_pct(profit_loss, total_investment)
         else:
             profit_loss_percent = None
+
+        loss_percent, recovery_needed_percent = portfolio_loss_and_recovery(profit_loss_percent)
+        missing_price_count = len(holdings) - priced_count
 
         # XIRR: all lots must have live price for a consistent IRR
         xirr_val = None
@@ -134,21 +146,39 @@ class PortfolioAnalysisView(APIView):
             "current_value": current_value_total,
             "profit_loss": profit_loss,
             "profit_loss_percent": profit_loss_percent,
+            "loss_percent": loss_percent,
+            "recovery_needed_percent": recovery_needed_percent,
             "priced_holdings_count": priced_count,
             "total_holdings_count": len(holdings),
             "xirr": xirr_val,
             "xirr_error": xirr_err,
         }
 
+        top_gainers, top_losers = top_gainers_and_losers(stocks_data)
+        insights = compute_insights(
+            stocks_data,
+            profit_loss_percent,
+            missing_price_count,
+            len(holdings),
+        )
+
         # Validate through serializers for stable schema
         sum_ser = AnalysisSummarySerializer(data=summary)
         sum_ser.is_valid(raise_exception=True)
-        st_ser = StockPerformanceSerializer(data=stocks_data, many=True)
-        st_ser.is_valid(raise_exception=True)
+        hold_ser = StockPerformanceSerializer(data=stocks_data, many=True)
+        hold_ser.is_valid(raise_exception=True)
+        tg_ser = StockPerformanceSerializer(data=top_gainers, many=True)
+        tg_ser.is_valid(raise_exception=True)
+        tl_ser = StockPerformanceSerializer(data=top_losers, many=True)
+        tl_ser.is_valid(raise_exception=True)
         out = {
             "success": True,
             "summary": sum_ser.validated_data,
-            "stocks": st_ser.validated_data,
+            "holdings": hold_ser.validated_data,
+            "top_gainers": tg_ser.validated_data,
+            "top_losers": tl_ser.validated_data,
+            "insights": insights,
+            "missing_price_count": missing_price_count,
         }
         final = AnalysisResponseSerializer(data=out)
         final.is_valid(raise_exception=True)

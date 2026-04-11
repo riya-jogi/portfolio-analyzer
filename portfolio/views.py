@@ -47,6 +47,13 @@ _COLUMN_ALIASES = {
     "average_cost": "buy_price",
     "cost_price": "buy_price",
     "buy_avg": "buy_price",
+    # Broker last traded price — stored for analytics fallback when live API fails
+    "ltp": "csv_ltp",
+    "last_price": "csv_ltp",
+    "last_traded_price": "csv_ltp",
+    "last_traded_price_ltp": "csv_ltp",
+    "market_price": "csv_ltp",
+    "close": "csv_ltp",
 }
 
 
@@ -315,6 +322,17 @@ class CsvUploadView(APIView):
                     rows_errors.append(f"Row {line}: quantity must be > 0 and buy_price >= 0")
                     continue
 
+                csv_ltp = None
+                if "csv_ltp" in df.columns:
+                    raw_ltp = row.get("csv_ltp")
+                    if raw_ltp is not None and not pd.isna(raw_ltp):
+                        try:
+                            v = Decimal(str(raw_ltp).strip().replace(",", ""))
+                            if v >= 0:
+                                csv_ltp = v
+                        except (InvalidOperation, ValueError):
+                            pass
+
             except (InvalidOperation, ValueError, TypeError) as e:
                 rows_errors.append(f"Row {line}: {e}")
                 continue
@@ -326,6 +344,7 @@ class CsvUploadView(APIView):
                     quantity=quantity,
                     buy_price=buy_price,
                     buy_date=buy_date,
+                    csv_ltp=csv_ltp,
                 )
             )
 
