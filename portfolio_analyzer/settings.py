@@ -121,5 +121,26 @@ LOGGING = {
             "level": _LOG_LEVEL,
             "propagate": False,
         },
+        # yfinance / HTTP clients are very chatty per symbol (404s, "possibly delisted").
+        "yfinance": {
+            "handlers": ["console"],
+            "level": "ERROR",
+            "propagate": False,
+        },
+        "urllib3": {
+            "handlers": ["console"],
+            "level": "WARNING",
+            "propagate": False,
+        },
+        "urllib3.connectionpool": {
+            "handlers": ["console"],
+            "level": "WARNING",
+            "propagate": False,
+        },
+        "requests": {
+            "handlers": ["console"],
+            "level": "WARNING",
+            "propagate": False,
+        },
     },
 }

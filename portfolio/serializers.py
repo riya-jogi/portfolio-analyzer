@@ -10,7 +10,7 @@ class HoldingSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Holding
-        fields = ("id", "stock_name", "quantity", "buy_price", "buy_date")
+        fields = ("id", "stock_name", "quantity", "buy_price", "buy_date", "csv_ltp")
 
 
 class UploadSuccessSerializer(serializers.Serializer):
