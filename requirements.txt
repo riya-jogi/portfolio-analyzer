@@ -1,0 +1,8 @@
+django>=4.2,<5
+djangorestframework>=3.14,<4
+pandas>=2.0
+yfinance>=0.2.40
+matplotlib>=3.8
+streamlit>=1.28
+pyxirr>=0.10.3
+requests>=2.31
